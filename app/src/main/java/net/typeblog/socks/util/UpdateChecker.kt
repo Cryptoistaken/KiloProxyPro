@@ -28,8 +28,8 @@ object UpdateChecker {
     )
 
     private const val UPDATE_URL =
-        "https://api.github.com/repos/Cryptoistaken/KiloProxy/releases/latest"
-    private const val USER_AGENT = "KiloProxy-Updater"
+        "https://api.github.com/repos/Cryptoistaken/KiloProxyPro/releases/latest"
+    private const val USER_AGENT = "KiloProxy-Pro-Updater"
     private const val TIMEOUT_MILLIS = 8000
     private const val DOWNLOAD_CONNECT_TIMEOUT = 30_000
     // A stalled read blocks cancel/pause until it times out (the flags are
