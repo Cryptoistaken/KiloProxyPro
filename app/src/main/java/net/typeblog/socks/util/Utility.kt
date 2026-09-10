@@ -156,6 +156,45 @@ object Utility {
         }
     }
 
+    /**
+     * Writes the hev-socks5-tunnel YAML config and returns its path.
+     * hev takes the TUN fd directly via JNI, so no sendfd/dnsgw/udpgw
+     * options exist: DNS flows through the tunnel to the Builder DNS
+     * server (8.8.8.8) over SOCKS, and UDP uses native UDP ASSOCIATE.
+     * Synchronous, call from a background thread. Plain ASCII only.
+     */
+    @JvmStatic
+    fun makeHevConf(dir: String, serverIp: String?, port: Int, user: String?, passwd: String?, ipv6: Boolean): String {
+        val sb = StringBuilder()
+        sb.appendLine("tunnel:")
+        sb.appendLine("  name: tun0")
+        sb.appendLine("  mtu: 1500")
+        sb.appendLine("  ipv4: 10.10.10.2")
+        if (ipv6) sb.appendLine("  ipv6: 'fdfe:dcba:9876::2'")
+        sb.appendLine("socks5:")
+        sb.appendLine("  port: $port")
+        sb.appendLine("  address: '${serverIp ?: ""}'")
+        sb.appendLine("  udp: 'udp'")
+        if (!user.isNullOrEmpty()) {
+            sb.appendLine("  username: '$user'")
+            sb.appendLine("  password: '${passwd ?: ""}'")
+        }
+        sb.appendLine("misc:")
+        sb.appendLine("  log-level: warn")
+        sb.appendLine("  connect-timeout: 10000")
+        sb.appendLine("  udp-read-write-timeout: 60000")
+        val f = File("$dir/hev.yml")
+        if (f.exists()) f.delete()
+        try {
+            FileOutputStream(f).use { out ->
+                out.write(sb.toString().toByteArray())
+                out.flush()
+            }
+        } catch (_: Exception) {
+        }
+        return f.absolutePath
+    }
+
     @JvmStatic
     fun startVpn(context: Context, profile: Profile) {
         val prefs = PreferenceManager.getDefaultSharedPreferences(context)

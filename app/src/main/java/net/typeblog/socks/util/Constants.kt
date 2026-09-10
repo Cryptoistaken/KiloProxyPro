@@ -42,6 +42,10 @@ object Constants {
     const val PREF_ACCEL_PROBE = "accel_probe"
     const val PREF_ACCEL_INTERVAL_MS = "accel_interval_ms"
     const val PREF_ACCEL_DNS_CACHE = "accel_dns_cache"
+    // Experimental engine swap: hev-socks5-tunnel instead of badvpn
+    // tun2socks + pdnsd. Default OFF = stock behavior. Independent of
+    // the accelerator master toggle.
+    const val PREF_HEV_TUNNEL = "hev_tunnel"
 
     const val PREF_FLOATING_CONTROL = "floating_control"
     const val PREF_BUBBLE_STYLE = "bubble_style"

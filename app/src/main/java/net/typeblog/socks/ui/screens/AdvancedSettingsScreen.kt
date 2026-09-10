@@ -51,6 +51,7 @@ import net.typeblog.socks.util.Constants.PREF_ACCEL_INTERVAL_MS
 import net.typeblog.socks.util.Constants.PREF_ACCEL_MODE
 import net.typeblog.socks.util.Constants.PREF_ACCEL_PRIMARY
 import net.typeblog.socks.util.Constants.PREF_ACCEL_PROBE
+import net.typeblog.socks.util.Constants.PREF_HEV_TUNNEL
 import net.typeblog.socks.util.Constants.PREF_VPN_ACCELERATOR
 
 private val INTERVAL_OPTIONS = listOf(
@@ -95,6 +96,9 @@ fun AdvancedSettingsScreen(
     var dnsCache by remember {
         mutableStateOf(prefs.getBoolean(PREF_ACCEL_DNS_CACHE, true))
     }
+    var hevTunnel by remember {
+        mutableStateOf(prefs.getBoolean(PREF_HEV_TUNNEL, false))
+    }
     DisposableEffect(context) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             when (key) {
@@ -105,6 +109,7 @@ fun AdvancedSettingsScreen(
                 PREF_ACCEL_PROBE -> probe = prefs.getBoolean(PREF_ACCEL_PROBE, true)
                 PREF_ACCEL_INTERVAL_MS -> intervalMs = prefs.getLong(PREF_ACCEL_INTERVAL_MS, 60000L)
                 PREF_ACCEL_DNS_CACHE -> dnsCache = prefs.getBoolean(PREF_ACCEL_DNS_CACHE, true)
+                PREF_HEV_TUNNEL -> hevTunnel = prefs.getBoolean(PREF_HEV_TUNNEL, false)
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -197,7 +202,7 @@ fun AdvancedSettingsScreen(
                     modifier = Modifier.padding(top = 16.dp)
                 )
                 Text(
-                    text = "Experimental options for faster repeat connects. Applies when Accelerator is on.",
+                    text = "Experimental options for faster repeat connects and tunnel engine. Connect options apply when Accelerator is on.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp)
@@ -285,6 +290,17 @@ fun AdvancedSettingsScreen(
                 onCheckedChange = {
                     dnsCache = it
                     prefs.edit().putBoolean(PREF_ACCEL_DNS_CACHE, it).apply()
+                }
+            )
+
+            SectionTitle(text = "Engine")
+            SwitchRow(
+                iconRes = R.drawable.lucide_settings,
+                label = "Fast tunnel (hev)",
+                checked = hevTunnel,
+                onCheckedChange = {
+                    hevTunnel = it
+                    prefs.edit().putBoolean(PREF_HEV_TUNNEL, it).apply()
                 }
             )
             Spacer(modifier = Modifier.height(24.dp))

@@ -25,6 +25,7 @@ import android.text.TextUtils
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.preference.PreferenceManager
+import hev.htproxy.TProxyService
 import net.typeblog.socks.R
 import net.typeblog.socks.util.Constants
 import net.typeblog.socks.util.Constants.ACTION_STOP_VPN
@@ -201,6 +202,8 @@ class SocksVpnService : VpnService() {
     private var mAccelProbe = true
     private var mAccelDns = true
     private var mAccelIntervalMs = 60000L
+    private var mHev = false
+    private var mHevActive = false
     private var mNotificationReceiverRegistered = false
     private var mScreenOffRegistered = false
     private var mScreenOnRegistered = false
@@ -477,13 +480,14 @@ class SocksVpnService : VpnService() {
         mAccelProbe = accelPrefs.getBoolean(Constants.PREF_ACCEL_PROBE, true)
         mAccelDns = accelPrefs.getBoolean(Constants.PREF_ACCEL_DNS_CACHE, true)
         mAccelIntervalMs = accelPrefs.getLong(Constants.PREF_ACCEL_INTERVAL_MS, 60000L)
+        mHev = accelPrefs.getBoolean(Constants.PREF_HEV_TUNNEL, false)
         val perApp = intent.getBooleanExtra(INTENT_PER_APP, false)
         val appBypass = intent.getBooleanExtra(INTENT_APP_BYPASS, false)
         val appList = intent.getStringArrayExtra(INTENT_APP_LIST)
         val ipv6 = intent.getBooleanExtra(INTENT_IPV6_PROXY, false)
         val udpgw = intent.getStringExtra(INTENT_UDP_GW)
 
-        Log.d(TAG, "onStartCommand: profile=$mProfileName server=$server:$port user=$username route=$route dns=$dns:$dnsPort perApp=$perApp ipv6=$ipv6 udpgw=$udpgw")
+        Log.d(TAG, "onStartCommand: profile=$mProfileName server=$server:$port user=$username route=$route dns=$dns:$dnsPort perApp=$perApp ipv6=$ipv6 udpgw=$udpgw hev=$mHev")
 
         createNotificationChannel()
 
@@ -613,6 +617,17 @@ class SocksVpnService : VpnService() {
                 Log.e(TAG, "Error destroying pdnsd process: ${e.message}")
             }
             mPdnsdProcess = null
+        }
+
+        // Stop the hev native tunnel if this session used it.
+        if (mHevActive) {
+            try {
+                TProxyService.TProxyStopService()
+                Log.d(TAG, "hev tunnel stopped")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error stopping hev tunnel: ${e.message}")
+            }
+            mHevActive = false
         }
 
         try {
@@ -843,15 +858,19 @@ class SocksVpnService : VpnService() {
                     }.apply { isDaemon = true; start() }
                 }
 
-                Utility.makePdnsdConf(this, dns ?: "8.8.8.8", dnsPort)
+                // hev path needs no pdnsd: DNS flows through the tunnel to
+                // the Builder DNS server over SOCKS (native UDP ASSOCIATE).
+                if (!mHev) {
+                    Utility.makePdnsdConf(this, dns ?: "8.8.8.8", dnsPort)
 
-                // Launch pdnsd non-blocking: no waitFor() (pdnsd.conf sets
-                // daemon=on so it forks into the background). It only needs to be
-                // running by the time the tunnel carries the first DNS query. Keep
-                // the Process reference so stopMe() can destroy it.
-                if (!launchPdnsd(dir, libDir)) {
-                    runOnMainThread { stopMe("pdnsd_start_failed") }
-                    return@Thread
+                    // Launch pdnsd non-blocking: no waitFor() (pdnsd.conf sets
+                    // daemon=on so it forks into the background). It only needs to be
+                    // running by the time the tunnel carries the first DNS query. Keep
+                    // the Process reference so stopMe() can destroy it.
+                    if (!launchPdnsd(dir, libDir)) {
+                        runOnMainThread { stopMe("pdnsd_start_failed") }
+                        return@Thread
+                    }
                 }
 
                 // FIX #5: resolve the SOCKS server hostname once on this background
@@ -880,6 +899,13 @@ class SocksVpnService : VpnService() {
                 // user stopped while connecting, abort before spawning tun2socks
                 // so the orphaned thread cannot resurrect the tunnel.
                 if (connectSeq != mConnectSeq || !mRunning || mSendfdCancelled) return@Thread
+
+                // Experimental hev engine: native tunnel takes the TUN fd
+                // directly via JNI — no tun2socks process, no sendfd poll.
+                if (mHev) {
+                    startHevTunnel(dir, fd, serverIp, port, user, passwd, ipv6, connectSeq)
+                    return@Thread
+                }
 
                 // NAT64/DNS64 mobile networks resolve IPv4-only proxy hostnames
                 // to an IPv6 (64:ff9b::/96) literal. tun2socks's BAddr parser
@@ -995,6 +1021,46 @@ class SocksVpnService : VpnService() {
                 runOnMainThread { stopMe("start_failed:${e.message}") }
             }
         }.apply { isDaemon = true }.start()
+    }
+
+    /**
+     * Experimental hev-socks5-tunnel bring-up. Writes hev.yml, hands the
+     * live TUN fd to the native tunnel via JNI, and marks connected at
+     * tunnel-up. Must run on a background thread (JNI start is quick, but
+     * resolve already happened above). Honors the connect generation and
+     * stop checkpoints like the stock path.
+     */
+    private fun startHevTunnel(dir: String, fd: Int, serverIp: String?, port: Int, user: String?, passwd: String?, ipv6: Boolean, connectSeq: Int) {
+        if (serverIp.isNullOrEmpty()) {
+            Log.e(TAG, "hev: no resolved server IP, stopping VPN")
+            runOnMainThread { stopMe("hev_no_server_ip") }
+            return
+        }
+        val confPath = Utility.makeHevConf(dir, serverIp, port, user, passwd, ipv6)
+        if (connectSeq != mConnectSeq || !mRunning || mSendfdCancelled) return
+        val started = try {
+            TProxyService.TProxyStartService(confPath, fd)
+        } catch (e: Exception) {
+            Log.e(TAG, "hev: TProxyStartService threw: ${e.message}", e)
+            runOnMainThread { stopMe("hev_start_failed:${e.message}") }
+            return
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e(TAG, "hev: native library missing: ${e.message}", e)
+            runOnMainThread { stopMe("hev_lib_missing") }
+            return
+        }
+        if (!started) {
+            Log.e(TAG, "hev: TProxyStartService returned false")
+            runOnMainThread { stopMe("hev_start_false") }
+            return
+        }
+        if (connectSeq != mConnectSeq || !mRunning || mSendfdCancelled) {
+            try { TProxyService.TProxyStopService() } catch (_: Exception) { }
+            return
+        }
+        mHevActive = true
+        Log.d(TAG, "hev: tunnel running, marking connected at tunnel-up")
+        runOnMainThread { if (!mSendfdCancelled && mRunning && connectSeq == mConnectSeq) postStartOnMain() }
     }
 
     private fun consumeProcessOutput(process: java.lang.Process?) {
