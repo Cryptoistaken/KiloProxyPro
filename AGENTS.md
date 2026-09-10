@@ -30,7 +30,7 @@
    - When the user later says to install after starting the device: install with `adb -s localhost:5557 install -r <apk>`; only uninstall first on signature/downgrade errors.
 
 ## Device notes
-- App package: `com.kiloproxy.app`. Device ABI: supports `arm64-v8a`.
+- App package: `com.kiloproxy.pro`. Device ABI: supports `arm64-v8a`.
 - Cross-ABI versionCode mismatch causes `INSTALL_FAILED_VERSION_DOWNGRADE` — install the ABI that matches the device; only uninstall before switching ABIs.
 - Signature mismatch → the installed app was signed with an older key (pre-keystore ephemeral CI key, or a different ABI build); uninstall once, then all future updates install over cleanly.
 

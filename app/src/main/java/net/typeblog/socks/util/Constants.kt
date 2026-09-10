@@ -54,9 +54,9 @@ object Constants {
     // Profile keys "perapp"/"appbypass"/"applist" are legacy per-profile aliases kept for compat.
     // Unique to this app's package so a sibling app built from the same base
     // code can never wake our receivers with its own broadcasts (and vice versa).
-    const val ACTION_STOP_VPN = "com.kiloproxy.app.STOP_VPN"
-    const val ACTION_START_VPN = "com.kiloproxy.app.START_VPN"
-    const val ACTION_VPN_STATE_CHANGED = "com.kiloproxy.app.VPN_STATE_CHANGED"
+    const val ACTION_STOP_VPN = "com.kiloproxy.pro.STOP_VPN"
+    const val ACTION_START_VPN = "com.kiloproxy.pro.START_VPN"
+    const val ACTION_VPN_STATE_CHANGED = "com.kiloproxy.pro.VPN_STATE_CHANGED"
     const val VPN_STATE_RUNNING = "running"
     const val VPN_STATE_TUNNEL_UP = "tunnel_up"
     const val VPN_STATE_VERIFIED = "verified"

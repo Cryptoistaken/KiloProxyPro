@@ -28,7 +28,7 @@ android {
             : gitCommitCount + 100
 
     defaultConfig {
-        applicationId "com.kiloproxy.app"
+        applicationId "com.kiloproxy.pro"
         minSdk 21
         targetSdk 36
         versionCode baseVersionCode
