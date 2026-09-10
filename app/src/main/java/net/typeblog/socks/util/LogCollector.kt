@@ -17,7 +17,7 @@ object LogCollector {
 
     fun collectLogs(context: Context): String {
         val header = buildString {
-            appendLine("=== KiloProxy Debug Logs ===")
+            appendLine("=== KiloProxy Pro Debug Logs ===")
             appendLine("Date: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())}")
             appendLine("Package: ${context.packageName}")
             appendLine("Android: ${android.os.Build.VERSION.RELEASE} (API ${android.os.Build.VERSION.SDK_INT})")
@@ -94,7 +94,7 @@ object LogCollector {
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "KiloProxy Debug Logs")
+            putExtra(Intent.EXTRA_SUBJECT, "KiloProxy Pro Debug Logs")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(intent, "Share logs"))

@@ -1122,7 +1122,7 @@ class FloatingControlService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val title = "KiloProxy"
+        val title = "KiloProxy Pro"
         val text = try {
             when {
                 state == BubbleState.CONNECTED && !vpnService?.currentIp.isNullOrEmpty() -> {

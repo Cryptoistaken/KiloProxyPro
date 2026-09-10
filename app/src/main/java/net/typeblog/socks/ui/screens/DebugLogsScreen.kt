@@ -173,7 +173,7 @@ fun DebugLogsScreen(onNavigateBack: () -> Unit) {
                 Button(
                     onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("KiloProxy Logs", logs.value)
+                        val clip = ClipData.newPlainText("KiloProxy Pro Logs", logs.value)
                         clipboard.setPrimaryClip(clip)
                         copied.value = true
                         Toast.makeText(context, "Logs copied", Toast.LENGTH_SHORT).show()

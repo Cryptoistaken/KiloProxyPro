@@ -253,13 +253,13 @@ fun StatusScreen(
         ) {
             Image(
                 painter = painterResource(id = logoSrc),
-                contentDescription = "KiloProxy",
+                contentDescription = "KiloProxy Pro",
                 modifier = Modifier.height(28.dp),
                 contentScale = ContentScale.Fit
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = "KiloProxy",
+                text = "KiloProxy Pro",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface

@@ -157,7 +157,7 @@ fun UpdateDialog(
         } else {
             Toast.makeText(
                 context,
-                "Please allow 'Install unknown apps' for KiloProxy, then try again",
+                "Please allow 'Install unknown apps' for KiloProxy Pro, then try again",
                 Toast.LENGTH_LONG
             ).show()
         }
@@ -178,8 +178,8 @@ fun UpdateDialog(
             title = { Text(text = "Allow installing updates?") },
             text = {
                 Text(
-                    text = "KiloProxy needs to install the update. " +
-                        "You'll be taken to Settings to allow \"Install unknown apps\" for KiloProxy " +
+                    text = "KiloProxy Pro needs to install the update. " +
+                        "You'll be taken to Settings to allow \"Install unknown apps\" for KiloProxy Pro " +
                         "- this is required only once."
                 )
             },
@@ -215,7 +215,7 @@ fun UpdateDialog(
                     // that R.mipmap.ic_launcher resolves to on API 26+,
                     // which crashed the dialog as soon as it appeared.
                     painter = painterResource(R.drawable.app_icon),
-                    contentDescription = "KiloProxy",
+                    contentDescription = "KiloProxy Pro",
                     modifier = Modifier
                         .size(52.dp)
                         .clip(RoundedCornerShape(14.dp))
