@@ -55,6 +55,11 @@ jobs:
           fi
 
       # --- Build: all ABIs + universal (universal contains all 4 .so sets; OS picks best at runtime) ---
+      - name: Run unit tests
+        run: gradle testDebugUnitTest --warning-mode all
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
+
       - name: Build Release APK
         run: |
           echo "Building universal + per-ABI APKs (all ABIs)"

@@ -173,11 +173,11 @@ object Utility {
         if (ipv6) sb.appendLine("  ipv6: 'fdfe:dcba:9876::2'")
         sb.appendLine("socks5:")
         sb.appendLine("  port: $port")
-        sb.appendLine("  address: '${serverIp ?: ""}'")
+        sb.appendLine("  address: '${yq(serverIp ?: "")}'")
         sb.appendLine("  udp: 'udp'")
         if (!user.isNullOrEmpty()) {
-            sb.appendLine("  username: '$user'")
-            sb.appendLine("  password: '${passwd ?: ""}'")
+            sb.appendLine("  username: '${yq(user)}'")
+            sb.appendLine("  password: '${yq(passwd ?: "")}'")
         }
         sb.appendLine("misc:")
         sb.appendLine("  log-level: warn")
@@ -194,6 +194,9 @@ object Utility {
         }
         return f.absolutePath
     }
+
+    /** YAML single-quote escape for hev.yml scalars: ' -> ''. */
+    private fun yq(s: String) = s.replace("'", "''")
 
     @JvmStatic
     fun startVpn(context: Context, profile: Profile) {
