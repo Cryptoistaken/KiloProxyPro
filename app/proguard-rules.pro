@@ -19,6 +19,10 @@
 # JNI native methods — only class referenced via registerNatives (System.kt -> system.cpp)
 -keep class net.typeblog.socks.System { native <methods>; }
 
+# hev-socks5-tunnel registers natives by class+method name at runtime
+# (hev-jni.c JNI_OnLoad -> hev.htproxy.TProxyService); keep names exact.
+-keep class hev.htproxy.TProxyService { *; }
+
 # R8: javax.annotation classes are referenced by com.google.crypto.tink but not on compile classpath
 -dontwarn javax.annotation.**
 -keep class javax.annotation.** { *; }

@@ -160,5 +160,16 @@ LOCAL_SRC_FILES := $(addprefix badvpn/, $(TUN2SOCKS_SOURCES))
 
 include $(BUILD_EXECUTABLE)
 
+########################################################
+## hev-socks5-tunnel (experimental, behind PREF_HEV_TUNNEL)
+## Vendored 2.17.1 (MIT). Builds shared lib only for our use;
+## hev/Android.mk also defines a -bin executable which is NOT
+## packaged (AGP ships *.so only). JNI binds to hev.htproxy.TProxyService.
+########################################################
+
+SAVED_LOCAL_PATH := $(LOCAL_PATH)
+include $(LOCAL_PATH)/hev/Android.mk
+LOCAL_PATH := $(SAVED_LOCAL_PATH)
+
 # Import cpufeatures
 $(call import-module,android/cpufeatures)

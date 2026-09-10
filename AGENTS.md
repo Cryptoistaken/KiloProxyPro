@@ -200,6 +200,7 @@ Notes on the merged notification/dot pass:
 |---|---|
 | `Android.mk`, `Application.mk` | ndkBuild top-level build files |
 | `badvpn/` | tun2socks engine (full badvpn fork: tun2socks/, lwip/ stack, client/, system/, etc.) |
+| `hev/` | hev-socks5-tunnel 2.17.1 (MIT, experimental, behind `PREF_HEV_TUNNEL`): modern tun2socks, builds `libhev-socks5-tunnel.so`, JNI `hev.htproxy.TProxyService` |
 | `pdnsd/` | pdnsd DNS proxy source |
 | `libancillary/` | ancillary fd passing (sendfd recvfd) |
 | `system.cpp` | JNI — `sendfd()` used by VPN tunnel setup |
