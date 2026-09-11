@@ -69,8 +69,12 @@ object Routes {
                 continue
             }
             val base = ipv4ToLong(parts[0].trim())
+            if (base == null) {
+                out.add(r)
+                continue
+            }
             val len = parts[1].trim().toIntOrNull()
-            if (base == null || len == null || len < 0 || len > 32) {
+            if (len == null || len < 0 || len > 32) {
                 out.add(r)
                 continue
             }
@@ -84,8 +88,8 @@ object Routes {
             }
             // Split down until the target half is a lone /32, keeping every
             // sibling along the way.
-            var curBase = base
-            var curLen = len
+            var curBase: Long = base
+            var curLen: Int = len
             while (curLen < 32) {
                 val halfSize = 1L shl (32 - curLen - 1)
                 val mid = curBase + halfSize
