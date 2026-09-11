@@ -782,16 +782,24 @@ class SocksVpnService : VpnService() {
         b.setMtu(1500)
             .setSession(name ?: "KiloProxy Pro")
             .addAddress("10.10.10.1", 24)
-            .addDnsServer("8.8.8.8")
+            .addDnsServer(HEV_DNS_SERVER)
 
         if (ipv6) {
             b.addAddress("fdfe:dcba:9876::1", 126)
                 .addRoute("::", 0)
         }
 
-        Routes.addRoutes(this, b, route ?: "all")
+        if (mHev) {
+            // hev path: the Builder DNS server stays OUTSIDE the tunnel so
+            // plain DNS goes direct to the real resolver. hev would have to
+            // relay it over SOCKS UDP, which TCP-only proxies refuse — with
+            // the carve-out DNS works everywhere and TCP still rides hev.
+            Routes.addRoutes(this, b, route ?: "all", HEV_DNS_SERVER)
+        } else {
+            Routes.addRoutes(this, b, route ?: "all")
 
-        b.addRoute("8.8.8.8", 32)
+            b.addRoute("8.8.8.8", 32)
+        }
 
         if (!perApp) {
             // Exclude the app's own UID from the tunnel. tun2socks and pdnsd run
@@ -869,8 +877,11 @@ class SocksVpnService : VpnService() {
                     }.apply { isDaemon = true; start() }
                 }
 
-                // hev path needs no pdnsd: DNS flows through the tunnel to
-                // the Builder DNS server over SOCKS (native UDP ASSOCIATE).
+                // hev path needs no pdnsd: the Builder DNS server is carved
+                // out of the tunnel routes (see configure), so plain DNS
+                // goes direct to the real resolver even when the proxy has
+                // no UDP support. UDP ASSOCIATE is only used for non-DNS
+                // UDP when the proxy allows it.
                 if (!mHev) {
                     Utility.makePdnsdConf(this, dns ?: "8.8.8.8", dnsPort)
 
@@ -1215,5 +1226,9 @@ class SocksVpnService : VpnService() {
         private const val DOZE_CHECK_INTERVAL = 60000L
         private const val STATS_INTERVAL = 1000L
         private const val USAGE_PERSIST_TICKS = 5L
+        // Builder DNS for both engines. On the hev path this same address
+        // is carved out of the tunnel routes (see configure) so DNS goes
+        // direct instead of dying on SOCKS UDP at TCP-only proxies.
+        private const val HEV_DNS_SERVER = "8.8.8.8"
     }
 }

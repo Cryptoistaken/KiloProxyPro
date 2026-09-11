@@ -318,7 +318,7 @@ fun AdvancedSettingsScreen(
                 }
             )
             Text(
-                text = "Fast tunnel needs a proxy with UDP support. If pages do not load with it on, turn UDP associate off. If it still fails, turn Fast tunnel off.",
+                text = "Fast tunnel uses the hev engine. DNS is resolved directly, so it works even when the proxy has no UDP support. UDP associate speeds up UDP apps where the proxy allows it.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
