@@ -50,4 +50,19 @@ class HevConfTest {
         assertTrue(c.contains("username: 'o''brien'"))
         assertTrue(c.contains("password: 'p''a''ss'"))
     }
+
+    @Test
+    fun udpAssociateOffOmitsUdpLine() {
+        val path = Utility.makeHevConf(tmp.root.absolutePath, "1.2.3.4", 1080, null, null, false, false)
+        val c = File(path).readText()
+        assertFalse("no udp line when associate is off", c.contains("udp:"))
+        assertTrue(c.contains("address: '1.2.3.4'"))
+    }
+
+    @Test
+    fun udpAssociateOnEmitsUdpLine() {
+        val path = Utility.makeHevConf(tmp.root.absolutePath, "1.2.3.4", 1080, null, null, false, true)
+        val c = File(path).readText()
+        assertTrue(c.contains("udp: 'udp'"))
+    }
 }

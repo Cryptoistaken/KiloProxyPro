@@ -203,6 +203,8 @@ class SocksVpnService : VpnService() {
     private var mAccelDns = true
     private var mAccelIntervalMs = 60000L
     private var mHev = false
+    private var mHevUdp = true
+    @Volatile
     private var mHevActive = false
     private var mNotificationReceiverRegistered = false
     private var mScreenOffRegistered = false
@@ -481,13 +483,14 @@ class SocksVpnService : VpnService() {
         mAccelDns = accelPrefs.getBoolean(Constants.PREF_ACCEL_DNS_CACHE, true)
         mAccelIntervalMs = accelPrefs.getLong(Constants.PREF_ACCEL_INTERVAL_MS, 60000L)
         mHev = accelPrefs.getBoolean(Constants.PREF_HEV_TUNNEL, false)
+        mHevUdp = accelPrefs.getBoolean(Constants.PREF_HEV_UDP, true)
         val perApp = intent.getBooleanExtra(INTENT_PER_APP, false)
         val appBypass = intent.getBooleanExtra(INTENT_APP_BYPASS, false)
         val appList = intent.getStringArrayExtra(INTENT_APP_LIST)
         val ipv6 = intent.getBooleanExtra(INTENT_IPV6_PROXY, false)
         val udpgw = intent.getStringExtra(INTENT_UDP_GW)
 
-        Log.d(TAG, "onStartCommand: profile=$mProfileName server=$server:$port user=$username route=$route dns=$dns:$dnsPort perApp=$perApp ipv6=$ipv6 udpgw=$udpgw hev=$mHev")
+        Log.d(TAG, "onStartCommand: profile=$mProfileName server=$server:$port user=$username route=$route dns=$dns:$dnsPort perApp=$perApp ipv6=$ipv6 udpgw=$udpgw hev=$mHev hevUdp=$mHevUdp")
 
         createNotificationChannel()
 
@@ -619,13 +622,19 @@ class SocksVpnService : VpnService() {
             mPdnsdProcess = null
         }
 
-        // Stop the hev native tunnel if this session used it.
-        if (mHevActive) {
+        // Stop the hev native tunnel when this session requested it. Checked
+        // against mHev as well as mHevActive: a stop landing between the
+        // native start and the active flag would otherwise leak a running
+        // tunnel whose next start always returns false. The native stop is
+        // safe when idle, so stopping twice is harmless.
+        if (mHev || mHevActive) {
             try {
                 TProxyService.TProxyStopService()
                 Log.d(TAG, "hev tunnel stopped")
             } catch (e: Exception) {
                 Log.e(TAG, "Error stopping hev tunnel: ${e.message}")
+            } catch (_: UnsatisfiedLinkError) {
+                Log.e(TAG, "hev native library missing at stop")
             }
             mHevActive = false
         }
@@ -645,6 +654,8 @@ class SocksVpnService : VpnService() {
         mPassword = null
         mDns = null
         mDnsPort = 53
+        mHev = false
+        mHevUdp = true
         mCurrentIp = null
         mCountryCode = null
         mIpInfo = null
@@ -903,7 +914,7 @@ class SocksVpnService : VpnService() {
                 // Experimental hev engine: native tunnel takes the TUN fd
                 // directly via JNI — no tun2socks process, no sendfd poll.
                 if (mHev) {
-                    startHevTunnel(dir, fd, serverIp, port, user, passwd, ipv6, connectSeq)
+                    startHevTunnel(dir, fd, serverIp, port, user, passwd, ipv6, mHevUdp, connectSeq)
                     return@Thread
                 }
 
@@ -1030,35 +1041,42 @@ class SocksVpnService : VpnService() {
      * resolve already happened above). Honors the connect generation and
      * stop checkpoints like the stock path.
      */
-    private fun startHevTunnel(dir: String, fd: Int, serverIp: String?, port: Int, user: String?, passwd: String?, ipv6: Boolean, connectSeq: Int) {
+    private fun startHevTunnel(dir: String, fd: Int, serverIp: String?, port: Int, user: String?, passwd: String?, ipv6: Boolean, udpAssociate: Boolean, connectSeq: Int) {
         if (serverIp.isNullOrEmpty()) {
             Log.e(TAG, "hev: no resolved server IP, stopping VPN")
+            mError = "Connection failed: could not resolve the proxy server."
             runOnMainThread { stopMe("hev_no_server_ip") }
             return
         }
-        val confPath = Utility.makeHevConf(dir, serverIp, port, user, passwd, ipv6)
+        val confPath = Utility.makeHevConf(dir, serverIp, port, user, passwd, ipv6, udpAssociate)
         if (connectSeq != mConnectSeq || !mRunning || mSendfdCancelled) return
         val started = try {
             TProxyService.TProxyStartService(confPath, fd)
-        } catch (e: Exception) {
-            Log.e(TAG, "hev: TProxyStartService threw: ${e.message}", e)
-            runOnMainThread { stopMe("hev_start_failed:${e.message}") }
-            return
         } catch (e: UnsatisfiedLinkError) {
             Log.e(TAG, "hev: native library missing: ${e.message}", e)
+            mError = "Connection failed: fast tunnel engine is missing from this build."
             runOnMainThread { stopMe("hev_lib_missing") }
             return
+        } catch (e: Exception) {
+            Log.e(TAG, "hev: TProxyStartService threw: ${e.message}", e)
+            mError = "Connection failed: fast tunnel could not start."
+            runOnMainThread { stopMe("hev_start_failed:${e.message}") }
+            return
         }
+        // Claim active immediately: a stop landing here must still stop the
+        // native tunnel (stopMe stops when mHev or mHevActive is set).
+        mHevActive = true
         if (!started) {
             Log.e(TAG, "hev: TProxyStartService returned false")
+            mError = "Connection failed: fast tunnel is already running or would not start. Restart the app and try again."
             runOnMainThread { stopMe("hev_start_false") }
             return
         }
         if (connectSeq != mConnectSeq || !mRunning || mSendfdCancelled) {
             try { TProxyService.TProxyStopService() } catch (_: Exception) { }
+            mHevActive = false
             return
         }
-        mHevActive = true
         Log.d(TAG, "hev: tunnel running, marking connected at tunnel-up")
         runOnMainThread { if (!mSendfdCancelled && mRunning && connectSeq == mConnectSeq) postStartOnMain() }
     }

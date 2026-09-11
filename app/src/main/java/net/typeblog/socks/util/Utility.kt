@@ -160,11 +160,13 @@ object Utility {
      * Writes the hev-socks5-tunnel YAML config and returns its path.
      * hev takes the TUN fd directly via JNI, so no sendfd/dnsgw/udpgw
      * options exist: DNS flows through the tunnel to the Builder DNS
-     * server (8.8.8.8) over SOCKS, and UDP uses native UDP ASSOCIATE.
-     * Synchronous, call from a background thread. Plain ASCII only.
+     * server (8.8.8.8) over SOCKS. udpAssociate=true uses UDP ASSOCIATE
+     * (faster, needs server UDP support); false relays UDP over the SOCKS
+     * TCP connection (works with TCP-only proxies). Synchronous, call
+     * from a background thread. Plain ASCII only.
      */
     @JvmStatic
-    fun makeHevConf(dir: String, serverIp: String?, port: Int, user: String?, passwd: String?, ipv6: Boolean): String {
+    fun makeHevConf(dir: String, serverIp: String?, port: Int, user: String?, passwd: String?, ipv6: Boolean, udpAssociate: Boolean = true): String {
         val sb = StringBuilder()
         sb.appendLine("tunnel:")
         sb.appendLine("  name: tun0")
@@ -174,7 +176,7 @@ object Utility {
         sb.appendLine("socks5:")
         sb.appendLine("  port: $port")
         sb.appendLine("  address: '${yq(serverIp ?: "")}'")
-        sb.appendLine("  udp: 'udp'")
+        if (udpAssociate) sb.appendLine("  udp: 'udp'")
         if (!user.isNullOrEmpty()) {
             sb.appendLine("  username: '${yq(user)}'")
             sb.appendLine("  password: '${yq(passwd ?: "")}'")

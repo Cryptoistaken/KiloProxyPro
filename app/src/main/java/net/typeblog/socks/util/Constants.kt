@@ -46,6 +46,10 @@ object Constants {
     // tun2socks + pdnsd. Default OFF = stock behavior. Independent of
     // the accelerator master toggle.
     const val PREF_HEV_TUNNEL = "hev_tunnel"
+    // hev UDP mode: true = UDP ASSOCIATE (faster, needs server UDP
+    // support), false = UDP over the SOCKS TCP connection (works with
+    // TCP-only proxies, slightly slower). Default true.
+    const val PREF_HEV_UDP = "hev_udp"
 
     const val PREF_FLOATING_CONTROL = "floating_control"
     const val PREF_BUBBLE_STYLE = "bubble_style"
