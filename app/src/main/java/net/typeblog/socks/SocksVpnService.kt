@@ -357,6 +357,11 @@ class SocksVpnService : VpnService() {
                                 notifyStateChanged()
                                 mIpCheckHandler.postDelayed(this, IP_INFO_RETRY)
                             } else if (!mAccel || mAccelProbe) {
+                                // SOCKS handshake failed against the address in
+                                // use. In accelerated mode that address may come
+                                // from the DNS cache; drop it so the next connect
+                                // resolves fresh instead of reusing a dead IP.
+                                if (mAccel) Utility.clearAccelDns(this)
                                 if (mProxyVerified) {
                                     mProxyVerified = false
                                     notifyStateChanged()
@@ -381,6 +386,7 @@ class SocksVpnService : VpnService() {
                                 mIpCheckHandler.postDelayed(this, IP_CHECK_RETRY)
                             } else {
                                 // Probe off: never tear down, only retry enrichment.
+                                if (mAccel) Utility.clearAccelDns(this)
                                 mIpCheckHandler.postDelayed(this, IP_CHECK_RETRY)
                             }
                         }
@@ -777,12 +783,43 @@ class SocksVpnService : VpnService() {
         nm.notify(NOTIFICATION_ID, notification)
     }
 
+    /**
+     * DNS server used by the hev path's route carve-out. The stock engine
+     * forwards DNS to the profile's configured server through pdnsd, so the
+     * hev path must use the same address for parity: a network that blocks
+     * 8.8.8.8 but allows the provider DNS keeps resolving. Falls back to
+     * 8.8.8.8 when the profile value is not a numeric address (addDnsServer
+     * requires one) or uses a non-standard port.
+     */
+    private fun hevDnsServer(): String {
+        val configured = mDns?.trim().orEmpty()
+        if (configured.isNotEmpty() && mDnsPort == 53 && isNumericAddress(configured)) return configured
+        return HEV_DNS_SERVER
+    }
+
+    private fun isNumericAddress(value: String): Boolean {
+        if (value.isEmpty()) return false
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                android.net.InetAddresses.isNumericAddress(value)
+            } else {
+                value.matches(Regex("^\\d{1,3}(\\.\\d{1,3}){3}$")) ||
+                    (value.contains(':') && value.all { it.isDigit() || it in "abcdefABCDEF:." })
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun configure(name: String?, route: String?, perApp: Boolean, bypass: Boolean, apps: Array<String>?, ipv6: Boolean) {
         val b = Builder()
+        // hev carve-out needs the profile DNS (stock pdnsd forwards there);
+        // the stock engine keeps its fixed 8.8.8.8 interception.
+        val dnsServer = if (mHev) hevDnsServer() else HEV_DNS_SERVER
         b.setMtu(1500)
             .setSession(name ?: "KiloProxy Pro")
             .addAddress("10.10.10.1", 24)
-            .addDnsServer(HEV_DNS_SERVER)
+            .addDnsServer(dnsServer)
 
         if (ipv6) {
             b.addAddress("fdfe:dcba:9876::1", 126)
@@ -794,7 +831,7 @@ class SocksVpnService : VpnService() {
             // plain DNS goes direct to the real resolver. hev would have to
             // relay it over SOCKS UDP, which TCP-only proxies refuse — with
             // the carve-out DNS works everywhere and TCP still rides hev.
-            Routes.addRoutes(this, b, route ?: "all", HEV_DNS_SERVER)
+            Routes.addRoutes(this, b, route ?: "all", dnsServer)
         } else {
             Routes.addRoutes(this, b, route ?: "all")
 
@@ -1083,9 +1120,32 @@ class SocksVpnService : VpnService() {
             runOnMainThread { stopMe("hev_start_false") }
             return
         }
+
+        // TProxyStartService only spawns the native worker and returns
+        // immediately; a config/tunnel init failure surfaces asynchronously
+        // by flipping TProxyIsRunning() back to false. Give the worker a
+        // moment so a dead tunnel is reported instead of a fake Connected
+        // state with no traffic.
+        try {
+            Thread.sleep(HEV_START_VERIFY_MS)
+        } catch (_: InterruptedException) {
+        }
+        val alive = try {
+            TProxyService.TProxyIsRunning()
+        } catch (_: Exception) {
+            false
+        }
         if (connectSeq != mConnectSeq || !mRunning || mSendfdCancelled) {
             try { TProxyService.TProxyStopService() } catch (_: Exception) { }
             mHevActive = false
+            return
+        }
+        if (!alive) {
+            Log.e(TAG, "hev: native tunnel exited right after start (see hev.log)")
+            mError = "Connection failed: fast tunnel could not start. Check the proxy server and try again."
+            try { TProxyService.TProxyStopService() } catch (_: Exception) { }
+            mHevActive = false
+            runOnMainThread { stopMe("hev_start_died") }
             return
         }
         Log.d(TAG, "hev: tunnel running, marking connected at tunnel-up")
@@ -1230,5 +1290,7 @@ class SocksVpnService : VpnService() {
         // is carved out of the tunnel routes (see configure) so DNS goes
         // direct instead of dying on SOCKS UDP at TCP-only proxies.
         private const val HEV_DNS_SERVER = "8.8.8.8"
+        // Time allowed for the async hev worker to prove it is alive.
+        private const val HEV_START_VERIFY_MS = 400L
     }
 }

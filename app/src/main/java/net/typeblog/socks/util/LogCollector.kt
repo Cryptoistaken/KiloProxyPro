@@ -14,6 +14,8 @@ object LogCollector {
     // produce an unshareable file. Keeps the newest tail.
     private const val MAX_LOG_CHARS = 200_000
     private const val CACHE_FILE = "debug_logs_cache.txt"
+    private const val HEV_LOG_FILE = "hev.log"
+    private const val HEV_LOG_TAIL_CHARS = 60_000
 
     fun collectLogs(context: Context): String {
         val header = buildString {
@@ -36,9 +38,14 @@ object LogCollector {
             }
         }
 
-        val result = (header + output).takeLast(MAX_LOG_CHARS)
+        // The hev (Fast tunnel) engine logs natively to filesDir/hev.log, not
+        // logcat: without this tail, native start/connect failures would be
+        // invisible in the shared debug logs.
+        val nativeLog = hevLogTail(context)
+        val combined = header + output + nativeLog
+        val result = combined.takeLast(MAX_LOG_CHARS)
         val cache = File(context.filesDir, CACHE_FILE)
-        if (hasRealLogs(output)) {
+        if (hasRealLogs(output + nativeLog)) {
             try {
                 cache.writeText(result)
             } catch (_: Exception) {
@@ -60,6 +67,18 @@ object LogCollector {
             val t = it.trim()
             t.isNotEmpty() && !t.startsWith("(") && !t.startsWith("--- process")
         }
+
+    /** Tail of the hev native engine log written to filesDir/hev.log. */
+    private fun hevLogTail(context: Context): String {
+        return try {
+            val f = File(context.filesDir, HEV_LOG_FILE)
+            if (!f.exists() || f.length() == 0L) return ""
+            val tail = f.readText().takeLast(HEV_LOG_TAIL_CHARS)
+            "\n--- fast tunnel (hev) native log (tail) ---\n$tail\n"
+        } catch (e: Exception) {
+            "\n--- fast tunnel (hev) native log unavailable: ${e.message} ---\n"
+        }
+    }
 
     private fun appProcessPids(context: Context): List<Int> {
         val mine = android.os.Process.myPid()

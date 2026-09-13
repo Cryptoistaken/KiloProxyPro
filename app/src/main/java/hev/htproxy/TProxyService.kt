@@ -7,8 +7,8 @@ package hev.htproxy
  * The native side registers these methods via RegisterNatives in JNI_OnLoad,
  * so the package/class/method names must match hev-jni.c defaults exactly
  * (PKGNAME=hev/htproxy, CLSNAME=TProxyService). ProGuard keeps this class
- * (see proguard-rules.pro). Not yet called by the engine — the active tunnel
- * is still badvpn tun2socks until the PREF_HEV_TUNNEL branch lands.
+ * (see proguard-rules.pro). Called by SocksVpnService when the Fast tunnel
+ * (PREF_HEV_TUNNEL) toggle is on.
  */
 object TProxyService {
     external fun TProxyStartService(configPath: String, fd: Int): Boolean

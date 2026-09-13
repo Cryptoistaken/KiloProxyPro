@@ -87,6 +87,7 @@ git revert <commit-hash>                  # undo a specific commit
 | `pre-proton-2-settings` | (pushed) | 2026-09-08 | Before replacing Split tunneling + Theme settings with the ProtonVPN mock design. |
 | `pre-notif-and-dot-fixes` | (pushed) | 2026-09-09 | Before notification large-icon fix + effective-theme wiring for bubble/popup. |
 | `pre-accelerator` | `353da5e` | 2026-09-10 | Before VPN Accelerator engine work (UI toggle only, engine untouched). |
+| `pre-hev-internet-fix` | `400a669` | 2026-09-14 | Before hev Fast-tunnel internet fixes (profile DNS parity, async start verification, hev.log diagnostics, accelerator DNS hardening, 16 KB flags). |
 
 > **One-time (do before the notification/dot pass):** done 2026-09-09 — tag `pre-notif-and-dot-fixes` created and pushed, table updated.
 
@@ -161,6 +162,11 @@ Notes on the merged notification/dot pass:
 - `FloatingControlService.kt` — notification uses custom RemoteViews: always-visible centered pill with Connect/Disconnect; connected bubble color is now `#DC2626` (light-theme `LightError`) instead of `DarkError #EF4444`.
 - `BubbleMenuOverlay.kt` / `bubble_country_row.xml` — connected-dot now positioned where the dial code was shown.
 
+Notes on the hev (Fast tunnel) engine path:
+- DNS: stock = system DNS 8.8.8.8 routed into the tunnel + pdnsd; hev = profile DNS (`Profile.getDns()`, fallback 8.8.8.8) carved out of the routes so it resolves directly (TCP-only proxies cannot relay DNS). `hevDnsServer()` enforces this.
+- Start is async: `TProxyStartService` returns immediately; the engine verifies `TProxyIsRunning()` after 400 ms and fails the connect if the native worker died (previously showed a fake Connected with no traffic).
+- Accelerator DNS cache: only numeric results are stored/accepted, IPv4 is preferred, and a failed SOCKS probe clears the cache so the next connect re-resolves.
+
 ### `.../util/`
 | File | Responsibility |
 |---|---|
@@ -198,9 +204,9 @@ Notes on the merged notification/dot pass:
 ### Native C — `app/src/main/jni/`
 | Area | Purpose |
 |---|---|
-| `Android.mk`, `Application.mk` | ndkBuild top-level build files |
+| `Android.mk`, `Application.mk` | ndkBuild top-level build files. badvpn/pdnsd/system link `-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384` (16 KB ELF alignment, required on Android 15/16 16 KB-page devices; NDK r27 does not align by default). |
 | `badvpn/` | tun2socks engine (full badvpn fork: tun2socks/, lwip/ stack, client/, system/, etc.) |
-| `hev/` | hev-socks5-tunnel 2.17.1 (MIT, experimental, behind `PREF_HEV_TUNNEL`): modern tun2socks, builds `libhev-socks5-tunnel.so`, JNI `hev.htproxy.TProxyService` |
+| `hev/` | hev-socks5-tunnel 2.17.1 (MIT, experimental, behind `PREF_HEV_TUNNEL`): modern tun2socks, builds `libhev-socks5-tunnel.so`, JNI `hev.htproxy.TProxyService`. Native engine log goes to `filesDir/hev.log` (set in hev.yml, rotated in `makeHevConf`, tailed by `LogCollector`). |
 | `pdnsd/` | pdnsd DNS proxy source |
 | `libancillary/` | ancillary fd passing (sendfd recvfd) |
 | `system.cpp` | JNI — `sendfd()` used by VPN tunnel setup |

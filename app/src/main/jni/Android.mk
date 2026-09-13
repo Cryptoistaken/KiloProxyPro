@@ -27,7 +27,9 @@ PDNSD_SOURCES  := $(wildcard $(LOCAL_PATH)/pdnsd/src/*.c)
 LOCAL_MODULE    := pdnsd
 LOCAL_SRC_FILES := $(PDNSD_SOURCES:$(LOCAL_PATH)/%=%)
 LOCAL_CFLAGS    := -Wall -O2 -I$(LOCAL_PATH)/pdnsd -DHAVE_STPCPY -fstack-protector-strong -D_FORTIFY_SOURCE=2 -Wno-gnu-designator -Wno-unused-label
-LOCAL_LDFLAGS   := -Wl,-z,relro,-z,now
+# 16 KB ELF alignment: required for Android 15/16 devices with 16 KB pages.
+# NDK r27 and lower do not align by default; see developer.android.com page-sizes.
+LOCAL_LDFLAGS   := -Wl,-z,relro,-z,now -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384
 
 include $(BUILD_EXECUTABLE)
 
@@ -61,7 +63,8 @@ LOCAL_CFLAGS := -fstack-protector-strong -D_FORTIFY_SOURCE=2
 LOCAL_SRC_FILES:= system.cpp
 
 LOCAL_LDLIBS := -ldl -llog
-LOCAL_LDFLAGS := -Wl,-z,relro,-z,now
+# 16 KB ELF alignment: required for Android 15/16 devices with 16 KB pages.
+LOCAL_LDFLAGS := -Wl,-z,relro,-z,now -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384
 
 LOCAL_STATIC_LIBRARIES := cpufeatures libancillary
 
@@ -154,7 +157,8 @@ TUN2SOCKS_SOURCES := \
 LOCAL_MODULE := tun2socks
 
 LOCAL_LDLIBS := -ldl -llog
-LOCAL_LDFLAGS := -Wl,-z,relro,-z,now
+# 16 KB ELF alignment: required for Android 15/16 devices with 16 KB pages.
+LOCAL_LDFLAGS := -Wl,-z,relro,-z,now -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384
 
 LOCAL_SRC_FILES := $(addprefix badvpn/, $(TUN2SOCKS_SOURCES))
 
