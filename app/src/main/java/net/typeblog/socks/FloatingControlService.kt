@@ -1128,12 +1128,9 @@ class FloatingControlService : Service() {
                 state == BubbleState.CONNECTED && !vpnService?.currentIp.isNullOrEmpty() -> {
                     val ip = vpnService?.currentIp ?: ""
                     val country = vpnService?.country ?: ""
-                    val flag = if (!vpnService?.countryCode.isNullOrEmpty()) {
-                        Utility.countryCodeToFlag(vpnService?.countryCode ?: "")
-                    } else {
-                        ""
-                    }
-                    if (country.isNotEmpty()) "$flag $country · $ip" else "Connected · $ip"
+                    // Notification content stays plain ASCII (repo rule): no
+                    // flag emoji, no middle-dot separator.
+                    if (country.isNotEmpty()) "$country - $ip" else "Connected - $ip"
                 }
                 state == BubbleState.CONNECTED -> "Connected"
                 state == BubbleState.CONNECTING -> "Connecting"
