@@ -538,7 +538,17 @@ class SocksVpnService : VpnService() {
         registerReceiverCompat(mNotificationActionReceiver, IntentFilter(ACTION_STOP_VPN))
         mNotificationReceiverRegistered = true
 
-        configure(mProfileName, route, perApp, appBypass, appList, ipv6)
+        // Builder.establish() documents IllegalArgumentException /
+        // IllegalStateException / SecurityException. A throw here used to
+        // crash the :vpn process with the tunnel half-configured; tear down
+        // cleanly instead so the UI sees a normal stop/error state.
+        try {
+            configure(mProfileName, route, perApp, appBypass, appList, ipv6)
+        } catch (e: Exception) {
+            Log.e(TAG, "configure() failed", e)
+            stopMe("configure_failed:${e.message}")
+            return START_STICKY
+        }
 
         if (DEBUG)
             Log.d(TAG, "fd: ${mInterface?.fd}")

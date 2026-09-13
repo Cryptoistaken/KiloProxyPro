@@ -48,7 +48,7 @@
 			android:title="@string/theme_mode"
 			android:entries="@array/theme_modes"
 			android:entryValues="@array/theme_mode_values"
-			android:defaultValue="light"
+			android:defaultValue="system"
 			android:summary="%s"/>
 	</PreferenceCategory>
 

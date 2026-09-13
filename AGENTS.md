@@ -154,7 +154,7 @@ Keep messages short and direct. State what happened, nothing else.
 | `SocksVpnService.kt` | **Engine** — VpnService + tun2socks/pdnsd spawn, tunnelling, notifications, stats, IP check. NEVER modify for UI. |
 | `FloatingControlService.kt` | Floating bubble (60dp) + flag pill overlays, long-press popup; WindowManager, SYSTEM_ALERT_WINDOW |
 | `BubbleMenuOverlay.kt` | Popup overlay shown near bubble: country list, search, positioning; window params/IME handling |
-| `BootReceiver.kt` | BOOT_COMPLETED auto-start receiver |
+| `BootReceiver.kt` | BOOT_COMPLETED + MY_PACKAGE_REPLACED auto-start receiver (restores VPN for auto-connect profiles and the floating bubble after reboot and after in-app updates) |
 | `AppSelector.kt` | Per-app selection list adapter |
 | `System.kt` | JNI bridge (sendfd) |
 

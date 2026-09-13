@@ -21,15 +21,20 @@ class BootReceiver : BroadcastReceiver() {
             val um = context.getSystemService(Context.USER_SERVICE) as? UserManager
             if (um != null && !um.isUserUnlocked) return
         }
+        val action = intent.action ?: return
         val p: Profile = try {
             ProfileManager.getInstance(context.applicationContext).getDefault()
         } catch (_: Exception) {
             return
         }
 
+        // BOOT_COMPLETED: device reboot. MY_PACKAGE_REPLACED: in-app update
+        // finished and the system killed the VPN/bubble services — the FGS
+        // docs list both as allowed foreground-service start triggers, so
+        // restore the same state the app would have had before the update.
         if (p.autoConnect() && VpnService.prepare(context) == null) {
             if (DEBUG) {
-                Log.d(TAG, "starting VPN service on boot")
+                Log.d(TAG, "starting VPN service after $action")
             }
 
             Utility.startVpn(context, p)
@@ -40,7 +45,7 @@ class BootReceiver : BroadcastReceiver() {
             (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context))
         ) {
             if (DEBUG) {
-                Log.d(TAG, "starting floating control service on boot")
+                Log.d(TAG, "starting floating control service after $action")
             }
             FloatingControlService.start(context)
         }
