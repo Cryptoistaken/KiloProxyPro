@@ -1,7 +1,10 @@
 package net.typeblog.socks
 
+import android.app.ActivityManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service.STOP_FOREGROUND_DETACH
 import android.app.Service.STOP_FOREGROUND_REMOVE
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -44,6 +47,7 @@ import net.typeblog.socks.util.Constants.INTENT_UDP_GW
 import net.typeblog.socks.util.Constants.INTENT_USERNAME
 import net.typeblog.socks.util.Constants.PREF_AUTO_STOP
 import net.typeblog.socks.util.IpInfo
+import net.typeblog.socks.util.ProfileManager
 import net.typeblog.socks.util.Routes
 import net.typeblog.socks.util.SocksTester
 import net.typeblog.socks.util.Utility
@@ -444,19 +448,18 @@ class SocksVpnService : VpnService() {
             Log.d(TAG, "starting")
         }
 
-        if (intent == null) {
-            stopSelf()
-            return START_STICKY
-        }
-
         // Ordered stop request (sent by stopVpn() right after the binder call).
         // Intents are delivered in order, so a stop queued behind a start still
         // lands: without this, cancelling while connecting is lost because the
         // binder stop() early-returns when onStartCommand has not run yet, and
         // the queued start then brings the tunnel up anyway.
-        if (intent.action == ACTION_STOP_VPN) {
+        if (intent?.action == ACTION_STOP_VPN) {
             Log.d(TAG, "onStartCommand: ordered stop received")
             stopMe("stop_action")
+            // If the service was not running, stopMe() early-returns: still stop
+            // the just-started service so a startForegroundService() stop
+            // request can never hit the 5-second foreground-service timeout.
+            stopSelf()
             return START_NOT_STICKY
         }
 
@@ -464,18 +467,42 @@ class SocksVpnService : VpnService() {
             return START_STICKY
         }
 
-        mProfileName = intent.getStringExtra(INTENT_NAME)
-        val server = intent.getStringExtra(INTENT_SERVER)
-        val port = intent.getIntExtra(INTENT_PORT, 1080)
-        val username = intent.getStringExtra(INTENT_USERNAME)
-        val passwd = intent.getStringExtra(INTENT_PASSWORD)
+        // The system starts the service itself for always-on VPN, and can
+        // redeliver a null intent after the process is killed. Neither carries
+        // our profile extras, so load the saved default profile and continue
+        // with that config (VPN developer guide: persist the config so it can
+        // be reconfigured on every system-driven start). Without this,
+        // always-on VPN never comes up.
+        var cmd = intent
+        if (cmd == null || !cmd.hasExtra(INTENT_SERVER)) {
+            val profile = try {
+                ProfileManager.getInstance(this).getDefault()
+            } catch (e: Exception) {
+                Log.e(TAG, "System-started VPN: failed to load saved profile", e)
+                null
+            }
+            val savedServer = profile?.getServer()
+            if (profile == null || savedServer.isNullOrEmpty() || savedServer == "127.0.0.1") {
+                Log.w(TAG, "System-started VPN has no saved profile; stopping")
+                stopSelf()
+                return START_STICKY
+            }
+            Log.d(TAG, "System-started VPN (always-on or restart): using profile ${profile.getName()}")
+            cmd = Utility.buildVpnIntent(this, profile)
+        }
+
+        mProfileName = cmd.getStringExtra(INTENT_NAME)
+        val server = cmd.getStringExtra(INTENT_SERVER)
+        val port = cmd.getIntExtra(INTENT_PORT, 1080)
+        val username = cmd.getStringExtra(INTENT_USERNAME)
+        val passwd = cmd.getStringExtra(INTENT_PASSWORD)
         mServer = server
         mPort = port
         mUsername = username
         mPassword = passwd
-        val route = intent.getStringExtra(INTENT_ROUTE)
-        val dns = intent.getStringExtra(INTENT_DNS)
-        val dnsPort = intent.getIntExtra(INTENT_DNS_PORT, 53)
+        val route = cmd.getStringExtra(INTENT_ROUTE)
+        val dns = cmd.getStringExtra(INTENT_DNS)
+        val dnsPort = cmd.getIntExtra(INTENT_DNS_PORT, 53)
         mDns = dns
         mDnsPort = dnsPort
         val accelPrefs = PreferenceManager.getDefaultSharedPreferences(this)
@@ -490,11 +517,11 @@ class SocksVpnService : VpnService() {
         mAccelIntervalMs = accelPrefs.getLong(Constants.PREF_ACCEL_INTERVAL_MS, 60000L)
         mHev = accelPrefs.getBoolean(Constants.PREF_HEV_TUNNEL, false)
         mHevUdp = accelPrefs.getBoolean(Constants.PREF_HEV_UDP, true)
-        val perApp = intent.getBooleanExtra(INTENT_PER_APP, false)
-        val appBypass = intent.getBooleanExtra(INTENT_APP_BYPASS, false)
-        val appList = intent.getStringArrayExtra(INTENT_APP_LIST)
-        val ipv6 = intent.getBooleanExtra(INTENT_IPV6_PROXY, false)
-        val udpgw = intent.getStringExtra(INTENT_UDP_GW)
+        val perApp = cmd.getBooleanExtra(INTENT_PER_APP, false)
+        val appBypass = cmd.getBooleanExtra(INTENT_APP_BYPASS, false)
+        val appList = cmd.getStringArrayExtra(INTENT_APP_LIST)
+        val ipv6 = cmd.getBooleanExtra(INTENT_IPV6_PROXY, false)
+        val udpgw = cmd.getStringExtra(INTENT_UDP_GW)
 
         Log.d(TAG, "onStartCommand: profile=$mProfileName server=$server:$port user=$username route=$route dns=$dns:$dnsPort perApp=$perApp ipv6=$ipv6 udpgw=$udpgw hev=$mHev hevUdp=$mHevUdp")
 
@@ -566,6 +593,21 @@ class SocksVpnService : VpnService() {
         }
     }
 
+    /**
+     * True while the floating bubble service (same app, main process) is alive
+     * and therefore shares NOTIFICATION_ID. On API 26+ this only lists our own
+     * app's services, which is exactly what we need.
+     */
+    private fun isFloatingControlRunning(): Boolean {
+        return try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+            @Suppress("DEPRECATION")
+            am.getRunningServices(64).any { it.service.className == FloatingControlService::class.java.name }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     override fun onDestroy() {
         Log.d(TAG, "onDestroy called")
         super.onDestroy()
@@ -595,11 +637,16 @@ class SocksVpnService : VpnService() {
         persistProfileBytes()
         mStatsHandler.removeCallbacks(mStatsRunnable)
         mIpCheckHandler.removeCallbacks(mIpCheckRunnable)
+        // Detach keeps the shared "floating control" notification alive for the
+        // bubble service. With no bubble service running, REMOVE so no stale
+        // Connected/Connecting notification is left behind (VPN guide: remove
+        // the notification once the service is inactive).
+        val keepNotification = isFloatingControlRunning()
         if (Build.VERSION.SDK_INT >= 34) {
-            stopForeground(STOP_FOREGROUND_DETACH)
+            stopForeground(if (keepNotification) STOP_FOREGROUND_DETACH else STOP_FOREGROUND_REMOVE)
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             @Suppress("DEPRECATION")
-            stopForeground(false)
+            stopForeground(!keepNotification)
         }
 
         val dir = filesDir.absolutePath
@@ -741,6 +788,7 @@ class SocksVpnService : VpnService() {
             // adaptive-icon XML on API 26+, which BitmapFactory cannot decode
             // (returns null), leaving a stale or missing large icon.
             .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.app_icon))
+            .setContentIntent(notificationContentIntent())
             .setOngoing(true)
             .build()
 
@@ -750,6 +798,15 @@ class SocksVpnService : VpnService() {
             startForeground(NOTIFICATION_ID, notification)
         }
     }
+
+    /** Tapping the VPN notification brings the app to the foreground. */
+    private fun notificationContentIntent(): PendingIntent =
+        PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
 
     private fun updateNotification() {
         if (!mRunning) return
@@ -768,6 +825,7 @@ class SocksVpnService : VpnService() {
             // adaptive-icon XML on API 26+, which BitmapFactory cannot decode
             // (returns null), leaving a stale or missing large icon.
             .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.app_icon))
+            .setContentIntent(notificationContentIntent())
             .setOngoing(true)
             .build()
 
@@ -820,6 +878,22 @@ class SocksVpnService : VpnService() {
             .setSession(name ?: "KiloProxy Pro")
             .addAddress("10.10.10.1", 24)
             .addDnsServer(dnsServer)
+
+        // A VPN is metered by default when targeting Android 10+. This tunnel
+        // just forwards the underlying connection, so inherit the underlying
+        // network's meteredness instead of marking the whole device metered.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            b.setMetered(false)
+        }
+
+        // "Configure" button in the system-managed VPN dialog.
+        b.setConfigureIntent(
+            PendingIntent.getActivity(
+                this, 0,
+                Intent(this, MainActivity::class.java),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+        )
 
         if (ipv6) {
             b.addAddress("fdfe:dcba:9876::1", 126)

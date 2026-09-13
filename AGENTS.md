@@ -88,6 +88,7 @@ git revert <commit-hash>                  # undo a specific commit
 | `pre-notif-and-dot-fixes` | (pushed) | 2026-09-09 | Before notification large-icon fix + effective-theme wiring for bubble/popup. |
 | `pre-accelerator` | `353da5e` | 2026-09-10 | Before VPN Accelerator engine work (UI toggle only, engine untouched). |
 | `pre-hev-internet-fix` | `400a669` | 2026-09-14 | Before hev Fast-tunnel internet fixes (profile DNS parity, async start verification, hev.log diagnostics, accelerator DNS hardening, 16 KB flags). |
+| `pre-android-parity` | `816486d` | 2026-09-13 | Before Android 15/16 parity fixes (16 KB ELF alignment, setMetered(false), always-on VPN start, stale-notification cleanup). |
 
 > **One-time (do before the notification/dot pass):** done 2026-09-09 — tag `pre-notif-and-dot-fixes` created and pushed, table updated.
 
@@ -158,7 +159,7 @@ Keep messages short and direct. State what happened, nothing else.
 | `System.kt` | JNI bridge (sendfd) |
 
 Notes on the merged notification/dot pass:
-- `SocksVpnService.kt` — reuses the shared "floating control" notification (id 2, channel `floating_control`) instead of a separate VPN notification; user sees only ONE notification. `stopMe` uses DETACH (not REMOVE) so the shared FGS notification is not torn down.
+- `SocksVpnService.kt` — reuses the shared "floating control" notification (id 2, channel `floating_control`) instead of a separate VPN notification; user sees only ONE notification. `stopMe` uses DETACH (not REMOVE) only while `FloatingControlService` is alive (shared FGS notification); with the bubble off it uses REMOVE so no stale Connected notification is left.
 - `FloatingControlService.kt` — notification uses custom RemoteViews: always-visible centered pill with Connect/Disconnect; connected bubble color is now `#DC2626` (light-theme `LightError`) instead of `DarkError #EF4444`.
 - `BubbleMenuOverlay.kt` / `bubble_country_row.xml` — connected-dot now positioned where the dial code was shown.
 
@@ -215,8 +216,8 @@ Notes on the hev (Fast tunnel) engine path:
 - `app/src/main/aidl/net/typeblog/socks/IVpnService.aidl` — **ENGINE** binder interface between activity/UI and SocksVpnService (DO NOT touch for UI)
 
 ### Manifest — `app/src/main/AndroidManifest.xml`
-- Permissions: INTERNET, RECEIVE_BOOT_COMPLETED, FOREGROUND_SERVICE, FOREGROUND_SERVICE_SPECIAL_USE, POST_NOTIFICATIONS, QUERY_ALL_PACKAGES (split-tunnel), SYSTEM_ALERT_WINDOW, VIBRATE
-- `SocksVpnService`: `process=":vpn"`, `exported=true`, BIND_VPN_SERVICE, fgType specialUse + subType property
+- Permissions: INTERNET, RECEIVE_BOOT_COMPLETED, FOREGROUND_SERVICE, FOREGROUND_SERVICE_SPECIAL_USE, POST_NOTIFICATIONS, SYSTEM_ALERT_WINDOW, VIBRATE, REQUEST_INSTALL_PACKAGES. App list visibility is handled by `<queries>` (MAIN action), NOT `QUERY_ALL_PACKAGES` (removed in the 2026-08-28 audit to stay off Play's restricted permission).
+- `SocksVpnService`: `process=":vpn"`, `exported=true`, BIND_VPN_SERVICE, fgType specialUse + subType property. Supports system always-on VPN: on a null/extra-less start the service falls back to the saved default profile via `Utility.buildVpnIntent`.
 - `FloatingControlService`: specialUse FGS
 - `BootReceiver`: exported=false, BOOT_COMPLETED
 - `FileProvider` authorities `${applicationId}.provider`, paths `@xml/file_paths`

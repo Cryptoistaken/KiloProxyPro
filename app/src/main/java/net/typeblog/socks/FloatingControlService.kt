@@ -1151,6 +1151,12 @@ class FloatingControlService : Service() {
         // layout rendered as an EMPTY notification row on some devices
         // (SystemUI shows only the app label + time). Title/text/action always
         // render in the standard template.
+        val contentIntent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
@@ -1160,6 +1166,7 @@ class FloatingControlService : Service() {
             // BitmapFactory cannot decode (returns null), leaving a stale or
             // missing large icon in the notification shade.
             .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.app_icon))
+            .setContentIntent(contentIntent)
             .setOngoing(true)
             .addAction(0, buttonText, buttonPending)
             .build()
