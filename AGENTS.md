@@ -205,7 +205,7 @@ Notes on the hev (Fast tunnel) engine path:
 | Area | Purpose |
 |---|---|
 | `Android.mk`, `Application.mk` | ndkBuild top-level build files. badvpn/pdnsd/system link `-Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384` (16 KB ELF alignment, required on Android 15/16 16 KB-page devices; NDK r27 does not align by default). |
-| `badvpn/` | tun2socks engine (full badvpn fork: tun2socks/, lwip/ stack, client/, system/, etc.) |
+| `badvpn/` | tun2socks engine (full badvpn fork: tun2socks/, lwip/ stack, client/, system/, etc.). `lwip/custom/lwipopts.h` tunes `TCP_WND`/`TCP_SND_BUF` to 65535 (lwIP default 4*MSS caps a single stream at ~0.5 Mbps on 100 ms proxy RTT; hev's lwIP already advertises ~64 KB). |
 | `hev/` | hev-socks5-tunnel 2.17.1 (MIT, experimental, behind `PREF_HEV_TUNNEL`): modern tun2socks, builds `libhev-socks5-tunnel.so`, JNI `hev.htproxy.TProxyService`. Native engine log goes to `filesDir/hev.log` (set in hev.yml, rotated in `makeHevConf`, tailed by `LogCollector`). |
 | `pdnsd/` | pdnsd DNS proxy source |
 | `libancillary/` | ancillary fd passing (sendfd recvfd) |

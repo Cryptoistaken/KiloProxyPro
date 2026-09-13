@@ -61,7 +61,14 @@
 #define MEMP_NUM_TCP_PCB_LISTEN 16
 #define MEMP_NUM_TCP_PCB 1024
 #define TCP_MSS 1460
-#define TCP_SND_BUF 16384
+// Receive window: lwIP's default is 4*MSS (5840 bytes), which caps a single
+// stream at ~0.5 Mbps over a 100 ms proxy path. 64 KB is the largest window
+// representable without window scaling and matches what hev's lwIP config
+// advertises (8*MSS with MSS clamped to 1460).
+#define TCP_WND 65535
+// Sender buffer: same reasoning for uploads. MEMP_MEM_MALLOC=1 keeps the
+// extra buffering heap-allocated and only as used per active connection.
+#define TCP_SND_BUF 65535
 #define TCP_SND_QUEUELEN (4 * (TCP_SND_BUF)/(TCP_MSS))
 
 #define MEM_LIBC_MALLOC 1
