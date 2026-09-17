@@ -34,8 +34,11 @@ jobs:
       # what the build needs with the runner's own cmdline-tools instead.
       - name: Setup Android SDK
         run: |
-          yes | sdkmanager --licenses --sdk_root="$ANDROID_SDK_ROOT" > /dev/null || true
-          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" --sdk_root="$ANDROID_SDK_ROOT"
+          CMDLINE=$(ls -d "$ANDROID_SDK_ROOT"/cmdline-tools/*/bin 2>/dev/null | tail -n 1)
+          echo "$CMDLINE" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          yes | "$CMDLINE/sdkmanager" --licenses --sdk_root="$ANDROID_SDK_ROOT" > /dev/null || true
+          "$CMDLINE/sdkmanager" --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" --sdk_root="$ANDROID_SDK_ROOT"
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
 
