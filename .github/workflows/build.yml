@@ -28,8 +28,16 @@ jobs:
           java-version: 17
           distribution: 'temurin'
 
+      # android-actions/setup-android was pinned but its bundled package
+      # list requests the long-removed obsolete "tools" package, failing
+      # every run inside sdkmanager before any compilation. Install only
+      # what the build needs with the runner's own cmdline-tools instead.
       - name: Setup Android SDK
-        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+        run: |
+          yes | sdkmanager --licenses --sdk_root="$ANDROID_SDK_ROOT" > /dev/null || true
+          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" --sdk_root="$ANDROID_SDK_ROOT"
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
 
       # --- Install NDK only if not already pre-installed on runner ---
       - name: Install NDK (skip if present)
