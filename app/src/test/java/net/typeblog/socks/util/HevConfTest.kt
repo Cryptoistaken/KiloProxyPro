@@ -27,7 +27,7 @@ class HevConfTest {
         assertTrue(c.contains("ipv4: 10.10.10.2"))
         assertTrue(c.contains("address: '1.2.3.4'"))
         assertTrue(c.contains("port: 1080"))
-        assertTrue(c.contains("udp: 'udp'"))
+        assertFalse("no udp line: proxies are TCP-only", c.contains("udp:"))
         assertTrue(c.contains("log-level: info"))
         assertTrue(c.contains("log-file: '"))
         assertTrue(c.contains("udp-read-write-timeout: 60000"))
@@ -53,17 +53,10 @@ class HevConfTest {
     }
 
     @Test
-    fun udpAssociateOffOmitsUdpLine() {
-        val path = Utility.makeHevConf(tmp.root.absolutePath, "1.2.3.4", 1080, null, null, false, false)
+    fun noUdpLineEverEmitted() {
+        val path = Utility.makeHevConf(tmp.root.absolutePath, "1.2.3.4", 1080, null, null, false)
         val c = File(path).readText()
-        assertFalse("no udp line when associate is off", c.contains("udp:"))
+        assertFalse("no udp line: proxies are TCP-only", c.contains("udp:"))
         assertTrue(c.contains("address: '1.2.3.4'"))
-    }
-
-    @Test
-    fun udpAssociateOnEmitsUdpLine() {
-        val path = Utility.makeHevConf(tmp.root.absolutePath, "1.2.3.4", 1080, null, null, false, true)
-        val c = File(path).readText()
-        assertTrue(c.contains("udp: 'udp'"))
     }
 }
