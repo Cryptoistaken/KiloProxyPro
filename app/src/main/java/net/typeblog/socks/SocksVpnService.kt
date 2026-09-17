@@ -207,7 +207,6 @@ class SocksVpnService : VpnService() {
     private var mAccelDns = true
     private var mAccelIntervalMs = 60000L
     private var mHev = false
-    private var mHevUdp = true
     @Volatile
     private var mHevActive = false
     private var mNotificationReceiverRegistered = false
@@ -516,14 +515,13 @@ class SocksVpnService : VpnService() {
         mAccelDns = accelPrefs.getBoolean(Constants.PREF_ACCEL_DNS_CACHE, true)
         mAccelIntervalMs = accelPrefs.getLong(Constants.PREF_ACCEL_INTERVAL_MS, 60000L)
         mHev = accelPrefs.getBoolean(Constants.PREF_HEV_TUNNEL, false)
-        mHevUdp = accelPrefs.getBoolean(Constants.PREF_HEV_UDP, true)
         val perApp = cmd.getBooleanExtra(INTENT_PER_APP, false)
         val appBypass = cmd.getBooleanExtra(INTENT_APP_BYPASS, false)
         val appList = cmd.getStringArrayExtra(INTENT_APP_LIST)
         val ipv6 = cmd.getBooleanExtra(INTENT_IPV6_PROXY, false)
         val udpgw = cmd.getStringExtra(INTENT_UDP_GW)
 
-        Log.d(TAG, "onStartCommand: profile=$mProfileName server=$server:$port user=$username route=$route dns=$dns:$dnsPort perApp=$perApp ipv6=$ipv6 udpgw=$udpgw hev=$mHev hevUdp=$mHevUdp")
+        Log.d(TAG, "onStartCommand: profile=$mProfileName server=$server:$port user=$username route=$route dns=$dns:$dnsPort perApp=$perApp ipv6=$ipv6 udpgw=$udpgw hev=$mHev")
 
         createNotificationChannel()
 
@@ -718,7 +716,6 @@ class SocksVpnService : VpnService() {
         mDns = null
         mDnsPort = 53
         mHev = false
-        mHevUdp = true
         mCurrentIp = null
         mCountryCode = null
         mIpInfo = null
@@ -1046,7 +1043,7 @@ class SocksVpnService : VpnService() {
                 // Experimental hev engine: native tunnel takes the TUN fd
                 // directly via JNI — no tun2socks process, no sendfd poll.
                 if (mHev) {
-                    startHevTunnel(dir, fd, serverIp, port, user, passwd, ipv6, mHevUdp, connectSeq)
+                    startHevTunnel(dir, fd, serverIp, port, user, passwd, ipv6, connectSeq)
                     return@Thread
                 }
 
@@ -1173,14 +1170,14 @@ class SocksVpnService : VpnService() {
      * resolve already happened above). Honors the connect generation and
      * stop checkpoints like the stock path.
      */
-    private fun startHevTunnel(dir: String, fd: Int, serverIp: String?, port: Int, user: String?, passwd: String?, ipv6: Boolean, udpAssociate: Boolean, connectSeq: Int) {
+    private fun startHevTunnel(dir: String, fd: Int, serverIp: String?, port: Int, user: String?, passwd: String?, ipv6: Boolean, connectSeq: Int) {
         if (serverIp.isNullOrEmpty()) {
             Log.e(TAG, "hev: no resolved server IP, stopping VPN")
             mError = "Connection failed: could not resolve the proxy server."
             runOnMainThread { stopMe("hev_no_server_ip") }
             return
         }
-        val confPath = Utility.makeHevConf(dir, serverIp, port, user, passwd, ipv6, udpAssociate)
+        val confPath = Utility.makeHevConf(dir, serverIp, port, user, passwd, ipv6)
         if (connectSeq != mConnectSeq || !mRunning || mSendfdCancelled) return
         val started = try {
             TProxyService.TProxyStartService(confPath, fd)

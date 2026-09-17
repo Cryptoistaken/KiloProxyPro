@@ -88,6 +88,7 @@ git revert <commit-hash>                  # undo a specific commit
 | `pre-notif-and-dot-fixes` | (pushed) | 2026-09-09 | Before notification large-icon fix + effective-theme wiring for bubble/popup. |
 | `pre-accelerator` | `353da5e` | 2026-09-10 | Before VPN Accelerator engine work (UI toggle only, engine untouched). |
 | `pre-hev-internet-fix` | `400a669` | 2026-09-14 | Before hev Fast-tunnel internet fixes (profile DNS parity, async start verification, hev.log diagnostics, accelerator DNS hardening, 16 KB flags). |
+| `pre-hev-udp-removal` | (pushed) | 2026-09-17 | Before removing the hev UDP-associate path (TCP-only proxies; app always UDP-over-TCP now). |
 | `pre-android-parity` | `816486d` | 2026-09-13 | Before Android 15/16 parity fixes (16 KB ELF alignment, setMetered(false), always-on VPN start, stale-notification cleanup). |
 
 > **One-time (do before the notification/dot pass):** done 2026-09-09 — tag `pre-notif-and-dot-fixes` created and pushed, table updated.
@@ -129,7 +130,7 @@ Keep messages short and direct. State what happened, nothing else.
 | `AGENTS.md` | This file — agent rules, build/install flow, snapshots, filesystem map |
 | `task.md` | VPN Accelerator task (experimental connect-time goal, SOCKS5-client scope) |
 | `checker/` | Own exit-IP checker (Cloudflare Worker source; deploys via wrangler, outside the APK build) |
-| `cli/` | On-device Go test harness (stdlib only) for the portable engine half, Pro edition: shared `probe`/`check`/`bench`/`sweep`/`speed`/`dns` plus Pro-only `udp` (UDP ASSOCIATE relay test with DNS query, mirrors PREF_HEV_UDP), `hevconf` (renders the exact hev.yml from makeHevConf), `routes` (Routes.excludeIpv4 carve-out preview). Build: `go build -o kiloproxy-pro .` in `cli/` (binary gitignored). Cannot drive TUN/native hev (Android-only). |
+| `cli/` | On-device Go test harness (stdlib only) for the portable engine half, Pro edition: shared `probe`/`check`/`bench`/`sweep`/`speed`/`dns` plus Pro-only `udp` (UDP ASSOCIATE relay test with DNS query; diagnostic only, the app itself is TCP-only since the UDP removal), `hevconf` (renders the exact hev.yml from makeHevConf, never emits the udp line), `routes` (Routes.excludeIpv4 carve-out preview). Build: `go build -o kiloproxy-pro .` in `cli/` (binary gitignored). Cannot drive TUN/native hev (Android-only). |
 | `protonvpn-settings.html` | Settings mock reference (tracked; `design/` docs were deleted) |
 | `build.gradle` | Root Gradle build (plugins: android.application, Kotlin compose) |
 | `settings.gradle` / `gradle.properties` / `gradle/wrapper/gradle-wrapper.properties` | Gradle config (Gradle 9.4.1, AGP 9.2.1, Kotlin 2.2.10, Java 17) |
@@ -168,6 +169,7 @@ Notes on the hev (Fast tunnel) engine path:
 - DNS: stock = system DNS 8.8.8.8 routed into the tunnel + pdnsd; hev = profile DNS (`Profile.getDns()`, fallback 8.8.8.8) carved out of the routes so it resolves directly (TCP-only proxies cannot relay DNS). `hevDnsServer()` enforces this.
 - Start is async: `TProxyStartService` returns immediately; the engine verifies `TProxyIsRunning()` after 400 ms and fails the connect if the native worker died (previously showed a fake Connected with no traffic).
 - Accelerator DNS cache: only numeric results are stored/accepted, IPv4 is preferred, and a failed SOCKS probe clears the cache so the next connect re-resolves.
+- UDP ASSOCIATE removed 2026-09-17 (`pre-hev-udp-removal`): proxies are TCP-only, so hev.yml never carries the `udp:` line and UDP rides the SOCKS TCP connection. `PREF_HEV_UDP` toggle deleted from Advanced Settings.
 
 ### `.../util/`
 | File | Responsibility |

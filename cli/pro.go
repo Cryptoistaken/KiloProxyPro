@@ -54,7 +54,7 @@ func runHevConf(args []string) int {
 	addProxyFlags(fs, &c)
 	fs.StringVar(&logDir, "logdir", "/data/data/com.kiloproxy.pro/files", "files dir owning hev.log (app filesDir)")
 	fs.BoolVar(&ipv6, "ipv6", false, "include tunnel ipv6 address")
-	fs.BoolVar(&associate, "udp", true, "udp associate mode (PREF_HEV_UDP): false = UDP over TCP")
+	fs.BoolVar(&associate, "udp", false, "render the udp associate line (app never emits it; proxies are TCP-only)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}

@@ -52,7 +52,6 @@ import net.typeblog.socks.util.Constants.PREF_ACCEL_MODE
 import net.typeblog.socks.util.Constants.PREF_ACCEL_PRIMARY
 import net.typeblog.socks.util.Constants.PREF_ACCEL_PROBE
 import net.typeblog.socks.util.Constants.PREF_HEV_TUNNEL
-import net.typeblog.socks.util.Constants.PREF_HEV_UDP
 import net.typeblog.socks.util.Constants.PREF_VPN_ACCELERATOR
 
 private val INTERVAL_OPTIONS = listOf(
@@ -100,9 +99,6 @@ fun AdvancedSettingsScreen(
     var hevTunnel by remember {
         mutableStateOf(prefs.getBoolean(PREF_HEV_TUNNEL, false))
     }
-    var hevUdp by remember {
-        mutableStateOf(prefs.getBoolean(PREF_HEV_UDP, true))
-    }
     DisposableEffect(context) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             when (key) {
@@ -114,7 +110,6 @@ fun AdvancedSettingsScreen(
                 PREF_ACCEL_INTERVAL_MS -> intervalMs = prefs.getLong(PREF_ACCEL_INTERVAL_MS, 60000L)
                 PREF_ACCEL_DNS_CACHE -> dnsCache = prefs.getBoolean(PREF_ACCEL_DNS_CACHE, true)
                 PREF_HEV_TUNNEL -> hevTunnel = prefs.getBoolean(PREF_HEV_TUNNEL, false)
-                PREF_HEV_UDP -> hevUdp = prefs.getBoolean(PREF_HEV_UDP, true)
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -308,17 +303,8 @@ fun AdvancedSettingsScreen(
                     prefs.edit().putBoolean(PREF_HEV_TUNNEL, it).apply()
                 }
             )
-            SwitchRow(
-                iconRes = R.drawable.lucide_arrows_right_left,
-                label = "UDP associate",
-                checked = hevUdp,
-                onCheckedChange = {
-                    hevUdp = it
-                    prefs.edit().putBoolean(PREF_HEV_UDP, it).apply()
-                }
-            )
             Text(
-                text = "Fast tunnel uses the hev engine. DNS is resolved directly, so it works even when the proxy has no UDP support. UDP associate speeds up UDP apps where the proxy allows it.",
+                text = "Fast tunnel uses the hev engine. DNS is resolved directly, so it works even when the proxy has no UDP support. UDP traffic rides the proxy TCP connection.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
