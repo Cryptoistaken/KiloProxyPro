@@ -55,6 +55,9 @@ func parseSweepLine(line string) (proxyCfg, error) {
 		return c, fmt.Errorf("want host:port[:user:pass], got %q", line)
 	}
 	c.host = parts[0]
+	if c.host == "" {
+		return c, fmt.Errorf("empty host in %q", line)
+	}
 	if _, err := fmt.Sscanf(parts[1], "%d", &c.port); err != nil || c.port <= 0 || c.port > 65535 {
 		return c, fmt.Errorf("bad port in %q", line)
 	}

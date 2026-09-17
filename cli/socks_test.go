@@ -185,3 +185,18 @@ func TestProbeUnreachable(t *testing.T) {
 		t.Fatalf("want UNREACHABLE for empty host, got %s", res2.Outcome)
 	}
 }
+
+func TestParseSweepLineRejects(t *testing.T) {
+	for _, line := range []string{":123", "", "# comment", "badline", "host:99999", "a:b:c:d:e"} {
+		if _, err := parseSweepLine(line); err == nil {
+			t.Fatalf("want error for %q", line)
+		}
+	}
+	c, err := parseSweepLine("gw.example.com:443:u:p")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.host != "gw.example.com" || c.port != 443 || c.user != "u" || c.pass != "p" {
+		t.Fatalf("bad parse: %+v", c)
+	}
+}

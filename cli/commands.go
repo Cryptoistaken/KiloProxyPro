@@ -144,7 +144,7 @@ func runBench(args []string) int {
 
 	type row struct {
 		resolve, tcp, hs, auth, conn, check time.Duration
-		outcome, ip, country                string
+		outcome, ip, country, checkErr      string
 	}
 	rows := make([]row, 0, repeat)
 	var totals, checks []time.Duration
@@ -169,6 +169,8 @@ func runBench(args []string) int {
 			r.check = first.Elapsed
 			if first.Info != nil {
 				r.ip, r.country = first.Info.IP, first.Info.CountryCode
+			} else {
+				r.checkErr = first.Err
 			}
 		}
 		rows = append(rows, r)
@@ -177,9 +179,13 @@ func runBench(args []string) int {
 		if pr.Outcome == ProbeOK {
 			ok++
 		}
-		fmt.Printf("iter %d: probe=%s resolve=%sms tcp=%sms hs=%sms auth=%sms conn=%sms check=%sms ip=%s %s\n",
+		fmt.Printf("iter %d: probe=%s resolve=%sms tcp=%sms hs=%sms auth=%sms conn=%sms check=%sms ip=%s %s",
 			i+1, pr.Outcome, ms(r.resolve), ms(r.tcp), ms(r.hs), ms(r.auth), ms(r.conn),
 			ms(r.check), firstNonEmpty(r.ip, "-"), firstNonEmpty(r.country, ""))
+		if r.checkErr != "" {
+			fmt.Printf(" check_err=%s", r.checkErr)
+		}
+		fmt.Println()
 	}
 
 	ts, cs := summarize(totals), summarize(checks)
@@ -197,12 +203,12 @@ func runBench(args []string) int {
 		}
 		defer f.Close()
 		w := csv.NewWriter(f)
-		_ = w.Write([]string{"iter", "resolve_ms", "tcp_ms", "handshake_ms", "auth_ms", "connect_ms", "total_ms", "outcome", "check_ms", "exit_ip", "country"})
+		_ = w.Write([]string{"iter", "resolve_ms", "tcp_ms", "handshake_ms", "auth_ms", "connect_ms", "total_ms", "outcome", "check_ms", "exit_ip", "country", "check_err"})
 		for i, r := range rows {
 			_ = w.Write([]string{
 				fmt.Sprint(i + 1), ms(r.resolve), ms(r.tcp), ms(r.hs), ms(r.auth), ms(r.conn),
 				ms(r.resolve + r.tcp + r.hs + r.auth + r.conn),
-				r.outcome, ms(r.check), r.ip, r.country,
+				r.outcome, ms(r.check), r.ip, r.country, r.checkErr,
 			})
 		}
 		w.Flush()
