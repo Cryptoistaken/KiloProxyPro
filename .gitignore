@@ -21,6 +21,9 @@ apk-out*/
 apk-out-fixed/
 artifacts/
 
+# Go CLI build output (cli/ is stdlib-only; build with: go build -o kiloproxy-pro .)
+/cli/kiloproxy-pro
+
 # Debug dumps, screenshots, mockups
 screenshots/
 uixml
